@@ -1,6 +1,7 @@
 package com.aishwarya.ers.controller;
 
 import com.aishwarya.ers.dto.UserResponseDTO;
+import com.aishwarya.ers.exception.ReimbursementNotFoundException;
 import com.aishwarya.ers.model.Reimbursement;
 import com.aishwarya.ers.model.ReimbursementStatus;
 import com.aishwarya.ers.model.Role;
@@ -71,7 +72,7 @@ public class ReimbursementController {
         }
     }
 
-    public void getById(Context ctx) {
+    public void getByUserId(Context ctx) {
         UserResponseDTO loggedInUser = ctx.sessionAttribute("currentUser");
 
         if (loggedInUser == null) {
@@ -96,6 +97,24 @@ public class ReimbursementController {
             ctx.status(403).result(e.getMessage());
         } catch (IllegalArgumentException e) {
             ctx.status(400).result(e.getMessage());
+        }
+    }
+
+    public void getById(Context ctx) {
+        UserResponseDTO loggedInUser = ctx.sessionAttribute("currentUser");
+        if (loggedInUser == null) {
+            ctx.status(401).result("Not logged in");
+            return;
+        }
+
+        try {
+            int reimbursementId = Integer.parseInt(ctx.pathParam("id"));
+            Reimbursement reimbursement = service.getById(reimbursementId);
+            ctx.status(200).json(reimbursement);
+        } catch (NumberFormatException e) {
+            ctx.status(400).result("Invalid reimbursement ID");
+        } catch (ReimbursementNotFoundException e) {
+            ctx.status(404).result(e.getMessage());
         }
     }
 
@@ -163,17 +182,16 @@ public class ReimbursementController {
             ctx.status(401).result("Not logged in");
             return;
         }
-        if (loggedInUser.getRole() != Role.MANAGER) {
-            ctx.status(403).result("Access Denied: You are not a manager.");
-            return;
+        try {
+            List<Reimbursement> reimbursements = service.getAllReimbursements(loggedInUser.getId());
+            if (reimbursements.isEmpty()) {
+                ctx.status(200).result("No reimbursements found");
+                return;
+            }
+            ctx.json(reimbursements);
+        } catch (IllegalArgumentException e) {
+            ctx.status(400).result(e.getMessage());
         }
-
-        List<Reimbursement> reimbursements = service.getAll();
-        if (reimbursements.isEmpty()) {
-            ctx.status(200).result("No reimbursements found");
-            return;
-        }
-        ctx.json(reimbursements);
     }
 
     public void getByUserIdAndStatus(Context ctx) {
